@@ -1,0 +1,22 @@
+let
+  var operacion: Integer;
+  var a: Integer;
+  var b: Integer;
+  var resultado: Integer
+in
+  begin
+    operacion := 3;
+    a := 15;
+    b := 5;
+    
+    resultado := match operacion of
+      case 1: a + b
+      case 2: a - b
+      case 3: a * b
+      case 4: a / b
+    otherwise:
+      0
+    end;
+    
+    putint(resultado)
+  end
