@@ -71,8 +71,11 @@ import Triangle.AbstractSyntaxTrees.Visitor;
 import Triangle.AbstractSyntaxTrees.VnameExpression;
 import Triangle.AbstractSyntaxTrees.WhileCommand;
 import javax.swing.tree.DefaultMutableTreeNode;
+
 import Triangle.AbstractSyntaxTrees.MatchCommand;
 import Triangle.AbstractSyntaxTrees.MatchExpression; // Match expression
+
+import Triangle.AbstractSyntaxTrees.*;
 
 /**
  * Implements the Triangle Visitor interface, which is used to
@@ -473,4 +476,43 @@ public class TreeVisitor implements Visitor {
         return(t);             
     }
     // </editor-fold>
+    
+    @Override
+    public Object visitEnumType(EnumType ast, Object obj) {
+        DefaultMutableTreeNode enumTypeNode = new DefaultMutableTreeNode("Enum Type");
+
+        // Nodo para el identificador del tipo
+        enumTypeNode.add((DefaultMutableTreeNode) ast.typeId.visit(this, null));
+
+        // Nodo para los valores
+        DefaultMutableTreeNode valuesNode = new DefaultMutableTreeNode("Values");
+        for (Identifier value : ast.values) {
+            valuesNode.add((DefaultMutableTreeNode) value.visit(this, null));
+        }
+
+        enumTypeNode.add(valuesNode);
+        return enumTypeNode;
+    }
+    
+    @Override
+    public Object visitEnumDeclaration(EnumDeclaration ast, Object obj) {
+        DefaultMutableTreeNode enumDeclNode = new DefaultMutableTreeNode("Enum Declaration");
+
+        // Nodo para el identificador del tipo enum (por ejemplo, Color)
+        enumDeclNode.add((DefaultMutableTreeNode) ast.typeId.visit(this, null));
+
+        // Nodo para los valores del enum
+        DefaultMutableTreeNode valuesNode = new DefaultMutableTreeNode("Values");
+        for (Identifier value : ast.values) {
+            valuesNode.add((DefaultMutableTreeNode) value.visit(this, null));
+        }
+
+        enumDeclNode.add(valuesNode);
+        return enumDeclNode;
+    }
+
+    @Override
+    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
+        return null; // o puedes retornar ast si prefieres
+    }
 }

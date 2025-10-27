@@ -78,8 +78,12 @@ import Triangle.CodeGenerator.UnknownAddress;
 import Triangle.CodeGenerator.UnknownRoutine;
 import Triangle.CodeGenerator.UnknownValue;
 import javax.swing.table.DefaultTableModel;
+
 import Triangle.AbstractSyntaxTrees.MatchCommand;
 import Triangle.AbstractSyntaxTrees.MatchExpression;
+
+import Triangle.AbstractSyntaxTrees.*;
+
 import Triangle.AbstractSyntaxTrees.Expression;
 import java.util.LinkedHashMap;
 /**
@@ -655,4 +659,39 @@ public class TableVisitor implements Visitor {
   // <editor-fold defaultstate="collapsed" desc=" Attributes ">
     private DefaultTableModel model;
     // </editor-fold>
+    
+    @Override
+    public Object visitEnumType(EnumType ast, Object o) {
+        // Visita el identificador del tipo enum
+        ast.typeId.visit(this, null);
+
+        // Visita cada valor del enum
+        for (Identifier value : ast.values) {
+            value.visit(this, null);
+        }
+
+        return null;
+    }
+    
+    @Override
+    public Object visitEnumDeclaration(EnumDeclaration ast, Object o) {
+        // Visita el identificador del tipo enum
+        ast.typeId.visit(this, null);
+
+        // Visita cada valor del enum
+        for (Identifier value : ast.values) {
+            value.visit(this, null);
+        }
+
+        return null;
+    }
+
+    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
+        System.out.println("EnumType: " + ast.typeId.spelling);
+        for (Identifier value : ast.values) {
+            System.out.println("  Value: " + value.spelling);
+        }
+        return null;
+    }
+  
 }

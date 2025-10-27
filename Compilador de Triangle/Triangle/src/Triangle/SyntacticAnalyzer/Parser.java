@@ -20,6 +20,8 @@ import Triangle.ErrorReporter;
 import Triangle.AbstractSyntaxTrees.*;
 import java.util.ArrayList;
 import java.util.List;
+import Triangle.AbstractSyntaxTrees.IntegerLiteral;
+
 
 public class Parser {
 
@@ -699,6 +701,51 @@ public class Parser {
       }
       break;
 
+    case Token.ENUM:
+    {
+      acceptIt(); // 'enum'
+      SourcePosition pos = currentToken.position;
+      Identifier typeId = parseIdentifier(); // enum name
+      accept(Token.LCURLY); // '{'
+
+      List<Identifier> enumValues = new ArrayList<>();
+      enumValues.add(parseIdentifier());
+
+      while (currentToken.kind == Token.COMMA) {
+        acceptIt();
+        enumValues.add(parseIdentifier());
+      }
+
+      accept(Token.RCURLY); // '}'
+      finish(pos);
+
+      // 1. Crear EnumTypeDenoter
+      EnumTypeDenoter enumType = new EnumTypeDenoter(typeId, enumValues, pos);
+
+      // 2. Crear TypeDeclaration para el tipo enum
+      TypeDeclaration typeDecl = new TypeDeclaration(typeId, enumType, pos);
+
+      // 3. Crear ConstDeclarations para cada valor
+      Declaration combinedDecl = typeDecl;
+      for (int i = 0; i < enumValues.size(); i++) {
+        Identifier original = enumValues.get(i);
+        Identifier valueId = new Identifier(original.spelling, original.position);
+        IntegerLiteral lit = new IntegerLiteral(String.valueOf(i), valueId.position);
+        IntegerExpression expr = new IntegerExpression(lit, valueId.position);
+        expr.type = enumType;
+
+        ConstDeclaration constDecl = new ConstDeclaration(valueId, expr, valueId.position);
+
+        combinedDecl = new SequentialDeclaration(combinedDecl, constDecl, valueId.position);
+      }
+
+      // 4. Asignar el AST final
+      declarationAST = combinedDecl;
+    }
+    break;
+
+
+    
     default:
       syntacticError("\"%\" cannot start a declaration",
         currentToken.spelling);

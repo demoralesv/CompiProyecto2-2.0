@@ -103,4 +103,9 @@ public interface Visitor {
   // Programs
   public abstract Object visitProgram(Program ast, Object o);
 
+  //News
+  public abstract Object visitEnumDeclaration(EnumDeclaration ast, Object o);
+  public abstract Object visitEnumType(EnumType ast, Object o);
+  public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o);
+
 }

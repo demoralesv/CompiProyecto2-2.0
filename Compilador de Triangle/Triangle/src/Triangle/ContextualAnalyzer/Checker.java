@@ -639,8 +639,24 @@ public final class Checker implements Visitor {
     Declaration binding = idTable.retrieve(I.spelling);
     if (binding != null)
       I.decl = binding;
-    return binding;
+
+    if (binding instanceof ConstDeclaration) {
+      return ((ConstDeclaration) binding).E.type;
+    } else if (binding instanceof VarDeclaration) {
+      return ((VarDeclaration) binding).T;
+    } else if (binding instanceof ConstFormalParameter) {
+      return ((ConstFormalParameter) binding).T;
+    } else if (binding instanceof VarFormalParameter) {
+      return ((VarFormalParameter) binding).T;
+    } else if (binding instanceof FuncDeclaration) {
+      return ((FuncDeclaration) binding).T;
+    } else if (binding instanceof ProcDeclaration) {
+      return new ErrorTypeDenoter(I.position); // no tipo de retorno
+    }
+
+    return new ErrorTypeDenoter(I.position); // fallback
   }
+
 
   public Object visitIntegerLiteral(IntegerLiteral IL, Object o) {
     return StdEnvironment.integerType;
@@ -738,6 +754,45 @@ public final class Checker implements Visitor {
     return null;
   }
 
+  //News
+  public Object visitEnumDeclaration(EnumDeclaration ast, Object o) {
+    // Crear el tipo enum
+    TypeDenoter enumType = new EnumType(ast.typeId, ast.values, ast.position);
+
+    // Registrar el tipo como una TypeDeclaration en la tabla de identificadores
+    TypeDeclaration typeDecl = new TypeDeclaration(ast.typeId, enumType, ast.position);
+    idTable.enter(ast.typeId.spelling, typeDecl);
+    if (typeDecl.duplicated)
+        reporter.reportError("identifier \"%\" already declared", ast.typeId.spelling, ast.position);
+
+    // Registrar cada valor como una constante de ese tipo
+    for (int i = 0; i < ast.values.size(); i++) {
+        Identifier original = ast.values.get(i);
+        Identifier valueId = new Identifier(original.spelling, original.position); // clonado
+
+        IntegerLiteral intLit = new IntegerLiteral(Integer.toString(i), valueId.position);
+        IntegerExpression expr = new IntegerExpression(intLit, valueId.position);
+        expr.type = enumType;
+
+        ConstDeclaration constDecl = new ConstDeclaration(valueId, expr, valueId.position);
+        idTable.enter(valueId.spelling, constDecl);
+        if (constDecl.duplicated)
+            reporter.reportError("identifier \"%\" already declared", valueId.spelling, valueId.position);
+    }
+
+    return null;
+  }
+
+
+  public Object visitEnumType(EnumType ast, Object o) {
+    // Los tipos enum son válidos por definición
+    return ast;
+  }
+
+  public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
+    return ast; // o simplemente return null si no necesitas hacer nada especial
+  }
+  
   // Checks whether the source program, represented by its AST, satisfies the
   // language's scope rules and type rules.
   // Also decorates the AST as follows:
