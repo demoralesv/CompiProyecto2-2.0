@@ -1,0 +1,10 @@
+let
+  enum Estado (Encendido, Apagado);
+  var dispositivo0 : Estado;
+  var dispositivo1 : Estado;
+  var dispositivo2 : Estado
+in
+  dispositivo0 := Encendido;
+  dispositivo1 := Apagado;
+  dispositivo2 := Encendido;
+end

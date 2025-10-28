@@ -170,8 +170,6 @@ public final class Encoder implements Visitor {
     return null;
   }
   
-  // Comando Match - Genera código que compara la expresión principal con cada caso
-  // y ejecuta el comando correspondiente al caso que coincida
   public Object visitMatchCommand(MatchCommand ast, Object o) {
     Frame frame = (Frame) o;
     List<Integer> endJumps = new ArrayList<>();
@@ -305,15 +303,14 @@ public final class Encoder implements Visitor {
     encodeFetch(ast.V, frame, valSize.intValue());
     return valSize;
   }
-  // Expresión Match - Genera código que compara la expresión principal con cada caso
-  // y evalúa la expresión correspondiente al caso que coincida
+
   public Object visitMatchExpression(MatchExpression ast, Object o) {
     Frame frame = (Frame) o;
     Integer size = 0;
 
     List<Integer> endJumps = new ArrayList<>();
 
-    // Generar código para cada caso en EList
+
     for (Expression caseLiteral : ast.EList.keySet()) {
         ast.E1.visit(this, frame);
         caseLiteral.visit(this, frame);
@@ -815,19 +812,13 @@ public final class Encoder implements Visitor {
   }
 
   //News
-  public Object visitEnumDeclaration(EnumDeclaration ast, Object o) {
-    // No se genera código TAM para enums directamente
-    return null;
-  }
-
-  public Object visitEnumType(EnumType ast, Object o) {
-    // Los tipos enum no generan código directamente
-    return null;
-  }
 
   public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
-    // Si no necesitas generar código TAM para tipos enum, puedes dejarlo vacío
-    return null;
+    if (ast.entity == null) {
+      ast.entity = new TypeRepresentation(Machine.integerSize);
+      writeTableDetails(ast);
+    }
+    return new Integer(Machine.integerSize);
   }
   
   public Encoder (ErrorReporter reporter) {

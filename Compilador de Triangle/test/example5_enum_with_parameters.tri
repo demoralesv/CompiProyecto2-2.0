@@ -1,0 +1,10 @@
+let
+  enum Figura (Circulo, Cuadrado);
+  var f : Figura;
+  var r : Integer;
+  var l : Integer;
+  var a : Integer
+in
+  r := 10;
+  f := Circulo;
+end

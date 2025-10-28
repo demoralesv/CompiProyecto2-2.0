@@ -122,12 +122,12 @@ public class TreeVisitor implements Visitor {
     public Object visitWhileCommand(WhileCommand ast, Object obj) {
         return(createBinary("While Command", ast.E, ast.C));
     }
-    // Comando Match - Crea un nodo de árbol que muestra la expresión principal y todos los casos
+
     public Object visitMatchCommand(MatchCommand ast, Object obj) {
         DefaultMutableTreeNode matchNode = new DefaultMutableTreeNode("Match Command");
-        // Nodo para la expresión principal
+       
         matchNode.add((DefaultMutableTreeNode) ast.E1.visit(this, null));
-        // Nodo para los casos
+        
         for (Expression caseLiteral : ast.CList.keySet()) {
             Command caseCommand = ast.CList.get(caseLiteral);
             matchNode.add((DefaultMutableTreeNode) caseLiteral.visit(this, null)); // Literal del caso
@@ -476,43 +476,17 @@ public class TreeVisitor implements Visitor {
         return(t);             
     }
     // </editor-fold>
-    
+
     @Override
-    public Object visitEnumType(EnumType ast, Object obj) {
-        DefaultMutableTreeNode enumTypeNode = new DefaultMutableTreeNode("Enum Type");
+    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object obj) {
+        DefaultMutableTreeNode enumNode = new DefaultMutableTreeNode("Enum Type: " + ast.typeId.spelling);
 
-        // Nodo para el identificador del tipo
-        enumTypeNode.add((DefaultMutableTreeNode) ast.typeId.visit(this, null));
-
-        // Nodo para los valores
-        DefaultMutableTreeNode valuesNode = new DefaultMutableTreeNode("Values");
+        // Add each enum value as a child node
         for (Identifier value : ast.values) {
-            valuesNode.add((DefaultMutableTreeNode) value.visit(this, null));
+            DefaultMutableTreeNode valueNode = new DefaultMutableTreeNode("Value: " + value.spelling);
+            enumNode.add(valueNode);
         }
 
-        enumTypeNode.add(valuesNode);
-        return enumTypeNode;
-    }
-    
-    @Override
-    public Object visitEnumDeclaration(EnumDeclaration ast, Object obj) {
-        DefaultMutableTreeNode enumDeclNode = new DefaultMutableTreeNode("Enum Declaration");
-
-        // Nodo para el identificador del tipo enum (por ejemplo, Color)
-        enumDeclNode.add((DefaultMutableTreeNode) ast.typeId.visit(this, null));
-
-        // Nodo para los valores del enum
-        DefaultMutableTreeNode valuesNode = new DefaultMutableTreeNode("Values");
-        for (Identifier value : ast.values) {
-            valuesNode.add((DefaultMutableTreeNode) value.visit(this, null));
-        }
-
-        enumDeclNode.add(valuesNode);
-        return enumDeclNode;
-    }
-
-    @Override
-    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
-        return null; // o puedes retornar ast si prefieres
+        return enumNode;
     }
 }

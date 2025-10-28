@@ -14,9 +14,6 @@
 
 package Triangle.ContextualAnalyzer;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-
 import Triangle.ErrorReporter;
 import Triangle.StdEnvironment;
 import Triangle.AbstractSyntaxTrees.*;
@@ -31,6 +28,10 @@ public final class Checker implements Visitor {
   public Object visitAssignCommand(AssignCommand ast, Object o) {
     TypeDenoter vType = (TypeDenoter) ast.V.visit(this, null);
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    
+    // Set the type on the expression for later use
+    ast.E.type = eType;
+    
     if (!ast.V.variable)
       reporter.reportError ("LHS of assignment is not a variable", "", ast.V.position);
     if (! eType.equals(vType))
@@ -40,17 +41,22 @@ public final class Checker implements Visitor {
 
 
   public Object visitCallCommand(CallCommand ast, Object o) {
+    
+    Declaration binding = idTable.retrieve(ast.I.spelling);
+    if (binding != null) {
+      ast.I.decl = binding;
+    }
 
-    Declaration binding = (Declaration) ast.I.visit(this, null);
-    if (binding == null)
+    if (binding == null) {
       reportUndeclared(ast.I);
-    else if (binding instanceof ProcDeclaration) {
+    } else if (binding instanceof ProcDeclaration) {
       ast.APS.visit(this, ((ProcDeclaration) binding).FPS);
     } else if (binding instanceof ProcFormalParameter) {
       ast.APS.visit(this, ((ProcFormalParameter) binding).FPS);
-    } else
+    } else {
       reporter.reportError("\"%\" is not a procedure identifier",
-                           ast.I.spelling, ast.I.position);
+                         ast.I.spelling, ast.I.position);
+    }
     return null;
   }
 
@@ -60,6 +66,8 @@ public final class Checker implements Visitor {
 
   public Object visitIfCommand(IfCommand ast, Object o) {
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    ast.E.type = eType;  // Store the condition's type
+    
     if (! eType.equals(StdEnvironment.booleanType))
       reporter.reportError("Boolean expression expected here", "", ast.E.position);
     ast.C1.visit(this, null);
@@ -83,32 +91,39 @@ public final class Checker implements Visitor {
 
   public Object visitWhileCommand(WhileCommand ast, Object o) {
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    ast.E.type = eType;  // Store the condition's type
+    
     if (! eType.equals(StdEnvironment.booleanType))
       reporter.reportError("Boolean expression expected here", "", ast.E.position);
     ast.C.visit(this, null);
     return null;
   }
   
-  // Comando Match - Verifica que la expresión principal sea de tipo entero o booleano
-  // y que todos los casos tengan el mismo tipo que la expresión principal
+
   public Object visitMatchCommand(MatchCommand ast, Object o) {
     TypeDenoter matchType = (TypeDenoter) ast.E1.visit(this, null);
-
-    if (!matchType.equals(StdEnvironment.integerType) && !matchType.equals(StdEnvironment.booleanType)) {
-        reporter.reportError("Match expression must be of type Integer or Boolean", "", ast.E1.position);
+    ast.E1.type = matchType;  // Store the match expression's type
+    
+    // Allow match on Integer, Boolean or Enum types (enums are represented
+    // semantically as EnumTypeDenoter instances).
+    if (!matchType.equals(StdEnvironment.integerType) && !matchType.equals(StdEnvironment.booleanType)
+      && !(matchType instanceof EnumTypeDenoter)) {
+      reporter.reportError("Match expression must be of type Integer, Boolean or Enum", "", ast.E1.position);
     }
 
     for (Expression caseLiteral : ast.CList.keySet()) {
         TypeDenoter caseLiteralType = (TypeDenoter) caseLiteral.visit(this, null);
+        caseLiteral.type = caseLiteralType;  // Store the case literal's type
+        
         if (!caseLiteralType.equals(matchType)) {
-            reporter.reportError("Case literal type does not match match expression type", "", caseLiteral.position);
+          reporter.reportError("Case literal type does not match match expression type", "", caseLiteral.position);
         }
 
         Command caseCommand = ast.CList.get(caseLiteral);
         caseCommand.visit(this, null);
     }
 
-    if (ast.C != null){
+    if (ast.C != null) {
         ast.C.visit(this, null);  
     }
     
@@ -122,16 +137,19 @@ public final class Checker implements Visitor {
 
   public Object visitArrayExpression(ArrayExpression ast, Object o) {
     TypeDenoter elemType = (TypeDenoter) ast.AA.visit(this, null);
-    IntegerLiteral il = new IntegerLiteral(new Integer(ast.AA.elemCount).toString(),
+    IntegerLiteral il = new IntegerLiteral(String.valueOf(ast.AA.elemCount),
                                            ast.position);
     ast.type = new ArrayTypeDenoter(il, elemType, ast.position);
     return ast.type;
   }
 
   public Object visitBinaryExpression(BinaryExpression ast, Object o) {
-
+    // Check and store types for both operands
     TypeDenoter e1Type = (TypeDenoter) ast.E1.visit(this, null);
     TypeDenoter e2Type = (TypeDenoter) ast.E2.visit(this, null);
+    ast.E1.type = e1Type;  // Store left operand's type
+    ast.E2.type = e2Type;  // Store right operand's type
+    
     Declaration binding = (Declaration) ast.O.visit(this, null);
 
     if (binding == null)
@@ -158,7 +176,11 @@ public final class Checker implements Visitor {
   }
 
   public Object visitCallExpression(CallExpression ast, Object o) {
-    Declaration binding = (Declaration) ast.I.visit(this, null);
+    Declaration binding = idTable.retrieve(ast.I.spelling);
+    if (binding != null) {
+      ast.I.decl = binding;
+    }
+    
     if (binding == null) {
       reportUndeclared(ast.I);
       ast.type = StdEnvironment.errorType;
@@ -196,49 +218,87 @@ public final class Checker implements Visitor {
     ast.type = e2Type;
     return ast.type;
   }
-   // Expresión Match - Verifica que la expresión principal sea de tipo entero o booleano,
-  // que todos los casos tengan el mismo tipo que la expresión principal,
-  // y que todas las expresiones de resultado tengan el mismo tipo
-  public Object visitMatchExpression(MatchExpression ast, Object o) {
-   
+
+  
+   public Object visitMatchExpression(MatchExpression ast, Object o) {
+      
       TypeDenoter matchType = (TypeDenoter) ast.E1.visit(this, null);
-    TypeDenoter caseExpressionType = null;
-    // La expresión principal debe ser de tipo Integer o Boolean
-    if (!matchType.equals(StdEnvironment.integerType) && !matchType.equals(StdEnvironment.booleanType)) {
-        reporter.reportError("Match expression must be of type Integer or Boolean", "", ast.E1.position);
-    }
+      ast.E1.type = matchType; 
+      
+      
+      if (!matchType.equals(StdEnvironment.integerType) && 
+          !matchType.equals(StdEnvironment.booleanType) &&
+          !(matchType instanceof EnumTypeDenoter)) {
+        reporter.reportError("Match expression must be of type Integer, Boolean or Enum", "", ast.E1.position);
+      }
+      
+      
+      TypeDenoter resultType = null;
+      for (Expression caseLiteral : ast.EList.keySet()) {
+          TypeDenoter caseLiteralType = (TypeDenoter) caseLiteral.visit(this, null);
+          caseLiteral.type = caseLiteralType; 
+          
+          if (!caseLiteralType.equals(matchType)) {
+              reporter.reportError("Case literal type does not match match expression type", "", caseLiteral.position);
+          }
 
-    // Verificar cada caso en la lista de casos
-    for (Expression caseLiteral : ast.EList.keySet()) {
-        TypeDenoter caseLiteralType = (TypeDenoter) caseLiteral.visit(this, null);
-        if (!caseLiteralType.equals(matchType)) {
-            reporter.reportError("Case literal type does not match match expression type", "", caseLiteral.position);
-        }
+          
+          Expression caseExpression = ast.EList.get(caseLiteral);
+          TypeDenoter caseExprType = (TypeDenoter) caseExpression.visit(this, null);
+          caseExpression.type = caseExprType;  
+          
+          
+          if (resultType == null) {
+              resultType = caseExprType;
+          } else if (!caseExprType.equals(resultType)) {
+              reporter.reportError("All case expressions must have same type", "", caseExpression.position);
+          }
+      }
 
-        // Verificar el tipo de la expresión asociada al caso
-        Expression caseExpression = ast.EList.get(caseLiteral);
-        caseExpressionType = (TypeDenoter)caseExpression.visit(this, null);
-    }
-
-    // Verificar otherwise
-    ast.E2.visit(this, null);
-    if (!ast.E2.type.equals(caseExpressionType) && caseExpressionType != null) {
-        reporter.reportError("Otherwise expression type does not match match expression type", "", ast.E2.position);
-    }
     
-    ast.type = StdEnvironment.integerType;
-    return ast.type;
+    TypeDenoter otherwiseType = null;
+    if (ast.E2 != null) {
+      otherwiseType = (TypeDenoter) ast.E2.visit(this, null);
+    }
+
+    
+    if (ast.E2 == null || otherwiseType == null) {
+          if (resultType == null) {
+              
+              reporter.reportError("Match expression has no valid cases or otherwise clause", "", ast.position);
+              ast.type = StdEnvironment.errorType;
+              return ast.type;
+          }
+          
+          ast.type = resultType;
+          return ast.type;
+      }
+      
+    
+    ast.E2.type = otherwiseType;
+      if (resultType != null && !otherwiseType.equals(resultType)) {
+          reporter.reportError("Otherwise expression type does not match case expression type", "", ast.E2.position);
+      }
+      
+      
+      ast.type = (resultType != null) ? resultType : otherwiseType;
+      return ast.type;
   }
 
   public Object visitIntegerExpression(IntegerExpression ast, Object o) {
-    ast.type = StdEnvironment.integerType;
+    // Preserve a pre-set type (e.g. when parser marked enum constants).
+    if (ast.type == null) {
+      ast.type = StdEnvironment.integerType;
+    }
     return ast.type;
   }
 
   public Object visitLetExpression(LetExpression ast, Object o) {
     idTable.openScope();
     ast.D.visit(this, null);
-    ast.type = (TypeDenoter) ast.E.visit(this, null);
+    TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    ast.E.type = eType;  // Store expression type
+    ast.type = eType;
     idTable.closeScope();
     return ast.type;
   }
@@ -250,8 +310,10 @@ public final class Checker implements Visitor {
   }
 
   public Object visitUnaryExpression(UnaryExpression ast, Object o) {
-
+    // Check and store type for the unary expression operand
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    ast.E.type = eType;  // Store the operand's type
+    
     Declaration binding = (Declaration) ast.O.visit(this, null);
     if (binding == null) {
       reportUndeclared(ast.O);
@@ -283,6 +345,7 @@ public final class Checker implements Visitor {
 
   public Object visitConstDeclaration(ConstDeclaration ast, Object o) {
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
+    ast.E.type = eType;  // Store expression's type for later use
     idTable.enter(ast.I.spelling, ast);
     if (ast.duplicated)
       reporter.reportError ("identifier \"%\" already declared",
@@ -456,7 +519,8 @@ public final class Checker implements Visitor {
   public Object visitConstActualParameter(ConstActualParameter ast, Object o) {
     FormalParameter fp = (FormalParameter) o;
     TypeDenoter eType = (TypeDenoter) ast.E.visit(this, null);
-
+    ast.E.type = eType;  // Store expression's type
+    
     if (! (fp instanceof ConstFormalParameter))
       reporter.reportError ("const actual parameter not expected here", "",
                             ast.position);
@@ -597,18 +661,23 @@ public final class Checker implements Visitor {
     return StdEnvironment.errorType;
   }
 
-  public Object visitSimpleTypeDenoter(SimpleTypeDenoter ast, Object o) {
-    Declaration binding = (Declaration) ast.I.visit(this, null);
+public Object visitSimpleTypeDenoter(SimpleTypeDenoter ast, Object o) {
+    // Look up the identifier's declaration directly from the identification table.
+    Declaration binding = idTable.retrieve(ast.I.spelling);
+    if (binding != null) {
+      ast.I.decl = binding;
+    }
+
     if (binding == null) {
-      reportUndeclared (ast.I);
+      reportUndeclared(ast.I);
       return StdEnvironment.errorType;
-    } else if (! (binding instanceof TypeDeclaration)) {
-      reporter.reportError ("\"%\" is not a type identifier",
-                            ast.I.spelling, ast.I.position);
+    } else if (binding instanceof TypeDeclaration) {
+      return ((TypeDeclaration) binding).T;
+    } else {
+      reporter.reportError("\"%\" is not a type identifier", ast.I.spelling, ast.I.position);
       return StdEnvironment.errorType;
     }
-    return ((TypeDeclaration) binding).T;
-  }
+}
 
   public Object visitIntTypeDenoter(IntTypeDenoter ast, Object o) {
     return StdEnvironment.integerType;
@@ -618,7 +687,7 @@ public final class Checker implements Visitor {
     ast.FT = (FieldTypeDenoter) ast.FT.visit(this, null);
     return ast;
   }
-
+ 
   public Object visitMultipleFieldTypeDenoter(MultipleFieldTypeDenoter ast, Object o) {
     ast.T = (TypeDenoter) ast.T.visit(this, null);
     ast.FT.visit(this, null);
@@ -707,28 +776,36 @@ public final class Checker implements Visitor {
 
   public Object visitSimpleVname(SimpleVname ast, Object o) {
     ast.variable = false;
-    ast.type = StdEnvironment.errorType;
-    Declaration binding = (Declaration) ast.I.visit(this, null);
-    if (binding == null)
+    // Remove: ast.type = StdEnvironment.errorType; - no type field
+    
+    // Retrieve the declaration bound to this identifier from the idTable
+    Declaration binding = idTable.retrieve(ast.I.spelling);
+    if (binding != null) {
+      ast.I.decl = binding;
+    }
+
+    TypeDenoter resultType = StdEnvironment.errorType;
+
+    if (binding == null) {
       reportUndeclared(ast.I);
-    else
-      if (binding instanceof ConstDeclaration) {
-        ast.type = ((ConstDeclaration) binding).E.type;
-        ast.variable = false;
-      } else if (binding instanceof VarDeclaration) {
-        ast.type = ((VarDeclaration) binding).T;
-        ast.variable = true;
-      } else if (binding instanceof ConstFormalParameter) {
-        ast.type = ((ConstFormalParameter) binding).T;
-        ast.variable = false;
-      } else if (binding instanceof VarFormalParameter) {
-        ast.type = ((VarFormalParameter) binding).T;
-        ast.variable = true;
-      } else
-        reporter.reportError ("\"%\" is not a const or var identifier",
-                              ast.I.spelling, ast.I.position);
-    return ast.type;
-  }
+    } else if (binding instanceof ConstDeclaration) {
+      resultType = ((ConstDeclaration) binding).E.type;
+      ast.variable = false;
+    } else if (binding instanceof VarDeclaration) {
+      resultType = ((VarDeclaration) binding).T;
+      ast.variable = true;
+    } else if (binding instanceof ConstFormalParameter) {
+      resultType = ((ConstFormalParameter) binding).T;
+      ast.variable = false;
+    } else if (binding instanceof VarFormalParameter) {
+      resultType = ((VarFormalParameter) binding).T;
+      ast.variable = true;
+    } else {
+      reporter.reportError("\"%\" is not a const or var identifier",
+                          ast.I.spelling, ast.I.position);
+    }
+    return resultType;
+}
 
   public Object visitSubscriptVname(SubscriptVname ast, Object o) {
     TypeDenoter vType = (TypeDenoter) ast.V.visit(this, null);
@@ -755,42 +832,10 @@ public final class Checker implements Visitor {
   }
 
   //News
-  public Object visitEnumDeclaration(EnumDeclaration ast, Object o) {
-    // Crear el tipo enum
-    TypeDenoter enumType = new EnumType(ast.typeId, ast.values, ast.position);
-
-    // Registrar el tipo como una TypeDeclaration en la tabla de identificadores
-    TypeDeclaration typeDecl = new TypeDeclaration(ast.typeId, enumType, ast.position);
-    idTable.enter(ast.typeId.spelling, typeDecl);
-    if (typeDecl.duplicated)
-        reporter.reportError("identifier \"%\" already declared", ast.typeId.spelling, ast.position);
-
-    // Registrar cada valor como una constante de ese tipo
-    for (int i = 0; i < ast.values.size(); i++) {
-        Identifier original = ast.values.get(i);
-        Identifier valueId = new Identifier(original.spelling, original.position); // clonado
-
-        IntegerLiteral intLit = new IntegerLiteral(Integer.toString(i), valueId.position);
-        IntegerExpression expr = new IntegerExpression(intLit, valueId.position);
-        expr.type = enumType;
-
-        ConstDeclaration constDecl = new ConstDeclaration(valueId, expr, valueId.position);
-        idTable.enter(valueId.spelling, constDecl);
-        if (constDecl.duplicated)
-            reporter.reportError("identifier \"%\" already declared", valueId.spelling, valueId.position);
-    }
-
-    return null;
-  }
-
-
-  public Object visitEnumType(EnumType ast, Object o) {
-    // Los tipos enum son válidos por definición
-    return ast;
-  }
+  
 
   public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
-    return ast; // o simplemente return null si no necesitas hacer nada especial
+    return ast; 
   }
   
   // Checks whether the source program, represented by its AST, satisfies the
@@ -950,14 +995,17 @@ public final class Checker implements Visitor {
     StdEnvironment.booleanDecl = declareStdType("Boolean", StdEnvironment.booleanType);
     StdEnvironment.falseDecl = declareStdConst("false", StdEnvironment.booleanType);
     StdEnvironment.trueDecl = declareStdConst("true", StdEnvironment.booleanType);
-    StdEnvironment.notDecl = declareStdUnaryOp("\\", StdEnvironment.booleanType, StdEnvironment.booleanType);
+  // Standard unary operators
+  StdEnvironment.notDecl = declareStdUnaryOp("\\", StdEnvironment.booleanType, StdEnvironment.booleanType);
+    
+  // Standard binary operators
     StdEnvironment.andDecl = declareStdBinaryOp("/\\", StdEnvironment.booleanType, StdEnvironment.booleanType, StdEnvironment.booleanType);
     StdEnvironment.orDecl = declareStdBinaryOp("\\/", StdEnvironment.booleanType, StdEnvironment.booleanType, StdEnvironment.booleanType);
 
     StdEnvironment.integerDecl = declareStdType("Integer", StdEnvironment.integerType);
     StdEnvironment.maxintDecl = declareStdConst("maxint", StdEnvironment.integerType);
-    StdEnvironment.addDecl = declareStdBinaryOp("+", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
-    StdEnvironment.subtractDecl = declareStdBinaryOp("-", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
+  StdEnvironment.addDecl = declareStdBinaryOp("+", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
+  StdEnvironment.subtractDecl = declareStdBinaryOp("-", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
     StdEnvironment.multiplyDecl = declareStdBinaryOp("*", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
     StdEnvironment.divideDecl = declareStdBinaryOp("/", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
     StdEnvironment.moduloDecl = declareStdBinaryOp("//", StdEnvironment.integerType, StdEnvironment.integerType, StdEnvironment.integerType);
@@ -984,7 +1032,11 @@ public final class Checker implements Visitor {
     StdEnvironment.geteolDecl = declareStdProc("geteol", new EmptyFormalParameterSequence(dummyPos));
     StdEnvironment.puteolDecl = declareStdProc("puteol", new EmptyFormalParameterSequence(dummyPos));
     StdEnvironment.equalDecl = declareStdBinaryOp("=", StdEnvironment.anyType, StdEnvironment.anyType, StdEnvironment.booleanType);
-    StdEnvironment.unequalDecl = declareStdBinaryOp("\\=", StdEnvironment.anyType, StdEnvironment.anyType, StdEnvironment.booleanType);
+  StdEnvironment.unequalDecl = declareStdBinaryOp("\\=", StdEnvironment.anyType, StdEnvironment.anyType, StdEnvironment.booleanType);
+
+  // Now declare unary minus AFTER the binary minus so the identification
+  // table resolves "-" to the unary operator when used in unary context.
+  StdEnvironment.negDecl = declareStdUnaryOp("-", StdEnvironment.integerType, StdEnvironment.integerType);
 
   }
 }

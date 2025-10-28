@@ -375,25 +375,9 @@ public class LayoutVisitor implements Visitor {
   }
 
   //News
-  public Object visitEnumDeclaration(EnumDeclaration ast, Object obj) {
-    DrawingTree dt = layoutCaption("EnumDeclaration");
+  
 
-    DrawingTree typeIdTree = (DrawingTree) ast.typeId.visit(this, null);
-    DrawingTree[] valueTrees = new DrawingTree[ast.values.size()];
-
-    for (int i = 0; i < ast.values.size(); i++) {
-      valueTrees[i] = (DrawingTree) ast.values.get(i).visit(this, null);
-    }
-
-    DrawingTree valuesGroup = new DrawingTree("Values", 0, 0);
-    valuesGroup.setChildren(valueTrees);
-
-    dt.setChildren(new DrawingTree[] { typeIdTree, valuesGroup });
-    attachParent(dt, join(dt));
-    return dt;
-  }
-
-  public Object visitEnumType(EnumType ast, Object obj) {
+  public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
     DrawingTree dt = layoutCaption("EnumType");
 
     DrawingTree typeIdTree = (DrawingTree) ast.typeId.visit(this, null);
@@ -409,12 +393,7 @@ public class LayoutVisitor implements Visitor {
     dt.setChildren(new DrawingTree[] { typeIdTree, valuesGroup });
     attachParent(dt, join(dt));
     return dt;
-  }
-  
-  public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
-    // Si estás usando LayoutVisitor para dibujar el AST, puedes representarlo como un nodo simple
-    return layoutUnary("EnumType", ast.typeId);
-  }
+}
 
 
   

@@ -148,11 +148,11 @@ public class TableVisitor implements Visitor {
       
       return(null);
   }
-  // Comando Match - Visita la expresión principal, todos los casos y el comando por defecto
+  
   public Object visitMatchCommand(MatchCommand ast, Object o) {
         ast.E1.visit(this, null);
         LinkedHashMap<Expression, Command> map = ast.CList;
-        // visitar cases
+        
         for (Expression e : map.keySet()) {
             Command c = map.get(e);
             e.visit(this, null);
@@ -660,38 +660,33 @@ public class TableVisitor implements Visitor {
     private DefaultTableModel model;
     // </editor-fold>
     
+    
+
     @Override
-    public Object visitEnumType(EnumType ast, Object o) {
-        // Visita el identificador del tipo enum
-        ast.typeId.visit(this, null);
-
-        // Visita cada valor del enum
-        for (Identifier value : ast.values) {
-            value.visit(this, null);
-        }
-
-        return null;
+    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
+    // Add the enum type itself to the table
+    try {
+        addIdentifier(ast.typeId.spelling, 
+                "EnumType", 
+                (ast.entity != null ? ast.entity.size : 0), 
+                -1, -1, -1);
+    } catch (NullPointerException e) { }
+    
+    // Add each enum value as a constant
+    for (int i = 0; i < ast.values.size(); i++) {
+        Identifier value = ast.values.get(i);
+        try {
+            addIdentifier(value.spelling, 
+                    "EnumValue", 
+                    0, // enum values are typically the size of integers
+                    -1, -1, i); // value is the enum index
+        } catch (NullPointerException e) { }
     }
     
-    @Override
-    public Object visitEnumDeclaration(EnumDeclaration ast, Object o) {
-        // Visita el identificador del tipo enum
-        ast.typeId.visit(this, null);
-
-        // Visita cada valor del enum
-        for (Identifier value : ast.values) {
-            value.visit(this, null);
-        }
-
-        return null;
-    }
-
-    public Object visitEnumTypeDenoter(EnumTypeDenoter ast, Object o) {
-        System.out.println("EnumType: " + ast.typeId.spelling);
-        for (Identifier value : ast.values) {
-            System.out.println("  Value: " + value.spelling);
-        }
-        return null;
+    // Visit the type identifier
+    ast.typeId.visit(this, null);
+    
+    return null;
     }
   
 }

@@ -245,7 +245,8 @@ public class Parser {
         acceptIt();
         Declaration dAST = parseDeclaration();
         accept(Token.IN);
-        Command cAST = parseSingleCommand();
+  Command cAST = parseCommand();
+  accept(Token.END); // consume the 'end' that closes the let-block
         finish(commandPos);
         commandAST = new LetCommand(dAST, cAST, commandPos);
       }
@@ -701,46 +702,44 @@ public class Parser {
       }
       break;
 
-    case Token.ENUM:
+        case Token.ENUM:
     {
-      acceptIt(); // 'enum'
-      SourcePosition pos = currentToken.position;
-      Identifier typeId = parseIdentifier(); // enum name
-      accept(Token.LCURLY); // '{'
+        acceptIt(); // 'enum'
+        SourcePosition pos = currentToken.position;
+        Identifier typeId = parseIdentifier(); // enum name
 
-      List<Identifier> enumValues = new ArrayList<>();
-      enumValues.add(parseIdentifier());
+        accept(Token.LPAREN); 
 
-      while (currentToken.kind == Token.COMMA) {
-        acceptIt();
+        List<Identifier> enumValues = new ArrayList<>();
         enumValues.add(parseIdentifier());
-      }
 
-      accept(Token.RCURLY); // '}'
-      finish(pos);
+        while (currentToken.kind == Token.COMMA) {
+            acceptIt();
+            enumValues.add(parseIdentifier());
+        }
 
-      // 1. Crear EnumTypeDenoter
-      EnumTypeDenoter enumType = new EnumTypeDenoter(typeId, enumValues, pos);
+        accept(Token.RPAREN);
+        finish(pos);
 
-      // 2. Crear TypeDeclaration para el tipo enum
-      TypeDeclaration typeDecl = new TypeDeclaration(typeId, enumType, pos);
+        
+        EnumTypeDenoter enumType = new EnumTypeDenoter(typeId, enumValues, pos);
 
-      // 3. Crear ConstDeclarations para cada valor
-      Declaration combinedDecl = typeDecl;
-      for (int i = 0; i < enumValues.size(); i++) {
-        Identifier original = enumValues.get(i);
-        Identifier valueId = new Identifier(original.spelling, original.position);
-        IntegerLiteral lit = new IntegerLiteral(String.valueOf(i), valueId.position);
-        IntegerExpression expr = new IntegerExpression(lit, valueId.position);
-        expr.type = enumType;
+        // Create type declaration for the enum
+        TypeDeclaration typeDecl = new TypeDeclaration(typeId, enumType, pos);
 
-        ConstDeclaration constDecl = new ConstDeclaration(valueId, expr, valueId.position);
+        // Create constant declarations for each enum value
+        Declaration combinedDecl = typeDecl;
+        for (int i = 0; i < enumValues.size(); i++) {
+            Identifier valueId = enumValues.get(i);
+            IntegerLiteral lit = new IntegerLiteral(String.valueOf(i), valueId.position);
+            IntegerExpression expr = new IntegerExpression(lit, valueId.position);
+            expr.type = enumType;
 
-        combinedDecl = new SequentialDeclaration(combinedDecl, constDecl, valueId.position);
-      }
+            ConstDeclaration constDecl = new ConstDeclaration(valueId, expr, valueId.position);
+            combinedDecl = new SequentialDeclaration(combinedDecl, constDecl, valueId.position);
+        }
 
-      // 4. Asignar el AST final
-      declarationAST = combinedDecl;
+        declarationAST = combinedDecl;
     }
     break;
 
@@ -913,6 +912,7 @@ public class Parser {
     case Token.OPERATOR:
     case Token.LET:
     case Token.IF:
+    case Token.MATCH:
     case Token.LPAREN:
     case Token.LBRACKET:
     case Token.LCURLY:

@@ -1,0 +1,12 @@
+let
+  enum Color (Red, Green, Blue);
+  var c : Color
+in
+  c := Red;
+  putint(match c of
+    case Red: 0
+    case Green: 1
+    case Blue: 2
+    otherwise: -1
+  end)
+end

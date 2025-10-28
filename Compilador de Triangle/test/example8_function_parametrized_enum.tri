@@ -1,0 +1,7 @@
+let
+  enum Figura (Circulo, Cuadrado);
+  var f : Figura
+in
+  f := Circulo;
+  if f = Circulo then putint(2 * 3 * 7) else putint(2 * (3 + 4))
+end

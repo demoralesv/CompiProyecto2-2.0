@@ -1,0 +1,7 @@
+let
+  enum Semaforo (Rojo, Amarillo, Verde);
+  var s : Semaforo
+in
+  s := Verde;
+  if s = Rojo then putint(0) else if s = Amarillo then putint(1) else putint(2)
+end
