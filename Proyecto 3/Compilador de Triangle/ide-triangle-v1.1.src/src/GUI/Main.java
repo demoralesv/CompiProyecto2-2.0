@@ -694,9 +694,7 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_compileMenuItemActionPerformed
 
-    /**
-     * Handles the "Compile to LLVM" menu option.
-     */
+
     private void compileToLLVMMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_compileToLLVMMenuItemActionPerformed
         if ((!((FileFrame)desktopPane.getSelectedFrame()).getPreviouslySaved()) || ((FileFrame)desktopPane.getSelectedFrame()).hasChanged()) {
             saveMenuItemActionPerformed(null);
@@ -737,10 +735,6 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_compileToLLVMMenuItemActionPerformed
 
-    /**
-     * Handles building the runtime (runtime.c -> runtime.ll / runtime.obj) by
-     * invoking the PowerShell helper script.
-     */
     private void buildRuntimeMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buildRuntimeMenuItemActionPerformed
         // Run in background thread
         new Thread(new Runnable() {
