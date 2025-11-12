@@ -1,8 +1,0 @@
-let
-  enum Nivel (Bajo, Medio, Alto);
-  var n : Nivel
-in
-  n := Alto;
-  if n = Bajo then putint(1)
-  else if n = Medio then putint(2) else putint(3)
-end

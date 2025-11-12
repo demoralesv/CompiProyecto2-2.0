@@ -1,6 +1,0 @@
-let
-  enum Color (Rojo, Verde, Azul);	
-  var c : Color
-in
-  c := Verde;
-end

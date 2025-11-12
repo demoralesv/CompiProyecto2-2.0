@@ -1,0 +1,13 @@
+let
+
+func inc(x : Integer) : Integer ~ x + 1
+
+in
+
+begin
+
+putint(inc(3));
+
+puteol()
+
+end

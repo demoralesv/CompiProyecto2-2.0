@@ -1,7 +1,0 @@
-let
-  enum Dia (Lunes, Martes, Miercoles, Jueves, Viernes);
-  var d : Dia
-in
-  d := Martes;
-  if d = Lunes then putint(1) else putint(0);
-end

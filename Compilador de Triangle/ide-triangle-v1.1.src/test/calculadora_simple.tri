@@ -1,5 +1,0 @@
-let
-  type Color = (Red, Green, Blue)
-in
-  skip
-end

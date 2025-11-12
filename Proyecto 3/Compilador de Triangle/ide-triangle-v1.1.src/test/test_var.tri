@@ -1,0 +1,15 @@
+let
+
+var n : Integer
+
+in
+
+begin
+
+n := 3;
+
+putint(n);
+
+puteol()
+
+end
