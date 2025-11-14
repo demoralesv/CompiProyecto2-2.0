@@ -97,7 +97,6 @@ public class IDECompiler {
             Checker checker = new Checker(report);
             checker.check(rootAST);
             if (report.numErrors == 0) {
-                // generate LLVM IR using LLVMEncoder
                 LLVMEncoder llvm = new LLVMEncoder();
                 Object res = rootAST.visit(llvm, null);
                 if (res instanceof String) {

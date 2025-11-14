@@ -1,0 +1,13 @@
+let
+
+var a : array 3 of Integer
+
+in
+
+begin
+
+a[0] := 10;
+putint(a[0]);
+puteol()
+
+end

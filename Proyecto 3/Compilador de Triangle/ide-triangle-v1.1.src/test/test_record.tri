@@ -1,0 +1,13 @@
+let
+
+var r : record x : Integer, y : Integer end
+
+in
+
+begin
+
+r.x := 7;
+putint(r.x);
+puteol()
+
+end

@@ -6,7 +6,7 @@ in
 
 begin
 
-putint(inc(3));
+putint(inc(10));
 
 puteol()
 

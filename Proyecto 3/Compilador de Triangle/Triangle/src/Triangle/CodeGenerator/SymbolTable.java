@@ -14,6 +14,13 @@ public class SymbolTable {
     public int level;
     public boolean isGlobal;
     public boolean isParam = false;
+    // Type/layout metadata
+    public String typeLLVM = "i32"; // e.g., "i32", "[10 x i32]", "%struct1"
+    public boolean isArray = false;
+    public int arrayLength = 0;
+    public boolean isRecord = false;
+    public String structName = null; // LLVM struct type name, e.g. %struct1
+    public java.util.Map<String,Integer> fieldIndex = null; // field name -> index
     // Layout and storage metadata (for LLVM codegen)
     public int offset = 0; // offset within frame (or 0 for globals)
     public int size = 0;
@@ -88,7 +95,6 @@ public class SymbolTable {
     return s;
   }
 
-  /** Return the mapping of the current (top) scope so callers can inspect declared symbols. */
   /** Return the mapping of the current (top) scope so callers can inspect declared symbols. */
   public Map<String,Symbol> getCurrentScopeSymbols() {
     return scopes.peek().symbols;

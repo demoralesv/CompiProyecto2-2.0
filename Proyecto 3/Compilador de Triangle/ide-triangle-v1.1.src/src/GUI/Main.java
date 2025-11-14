@@ -38,10 +38,16 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import Triangle.IDECompiler;
+import java.util.Properties;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import Core.ExampleFileFilter;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 import Core.Visitors.TreeVisitor;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 /**
@@ -483,7 +489,7 @@ public class Main extends javax.swing.JFrame {
 
         triangleMenu.add(compileMenuItem);
 
-        // New menu item: compile to LLVM
+        
         compileToLLVMMenuItem = new javax.swing.JMenuItem();
         compileToLLVMMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconTriangleCompile.gif")));
         compileToLLVMMenuItem.setText("To LLVM");
@@ -495,7 +501,21 @@ public class Main extends javax.swing.JFrame {
         });
         triangleMenu.add(compileToLLVMMenuItem);
 
-        // Build runtime menu item
+        // Show Optimize option only when 'opt' is available on PATH
+        if (isOptAvailable()) {
+            optimizeMenuItem = new javax.swing.JCheckBoxMenuItem();
+            optimizeMenuItem.setText("Optimize IR (run opt)");
+            optimizeMenuItem.setEnabled(true);
+            optimizeMenuItem.setSelected(false);
+            optimizeMenuItem.addActionListener(new java.awt.event.ActionListener() {
+                public void actionPerformed(java.awt.event.ActionEvent evt) {
+                    optimizeMenuItemActionPerformed(evt);
+                }
+            });
+            triangleMenu.add(optimizeMenuItem);
+        }
+
+        
         buildRuntimeMenuItem = new javax.swing.JMenuItem();
         buildRuntimeMenuItem.setText("Build LLVM Runtime");
         buildRuntimeMenuItem.setEnabled(true);
@@ -506,7 +526,7 @@ public class Main extends javax.swing.JFrame {
         });
         triangleMenu.add(buildRuntimeMenuItem);
 
-        // Compile to native (uses runtime scripts)
+        
         compileToNativeMenuItem = new javax.swing.JMenuItem();
         compileToNativeMenuItem.setText("Compile LLVM -> Native");
         compileToNativeMenuItem.setEnabled(false);
@@ -517,7 +537,7 @@ public class Main extends javax.swing.JFrame {
         });
         triangleMenu.add(compileToNativeMenuItem);
 
-        // Run native executable
+        
         runNativeMenuItem = new javax.swing.JMenuItem();
         runNativeMenuItem.setText("Run Native");
         runNativeMenuItem.setEnabled(false);
@@ -528,7 +548,7 @@ public class Main extends javax.swing.JFrame {
         });
         triangleMenu.add(runNativeMenuItem);
 
-        // Run native in external shell (opens a new OS shell window)
+        
         runNativeShellMenuItem = new javax.swing.JMenuItem();
         runNativeShellMenuItem.setText("Run Native in Shell");
         runNativeShellMenuItem.setEnabled(false);
@@ -551,6 +571,8 @@ public class Main extends javax.swing.JFrame {
         });
 
         triangleMenu.add(runMenuItem);
+
+    // end of dynamic menu items
 
         menuBar.add(triangleMenu);
 
@@ -694,14 +716,15 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_compileMenuItemActionPerformed
 
-
+    /**
+     * Handles the "Compile to LLVM" menu option.
+     */
     private void compileToLLVMMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_compileToLLVMMenuItemActionPerformed
         if ((!((FileFrame)desktopPane.getSelectedFrame()).getPreviouslySaved()) || ((FileFrame)desktopPane.getSelectedFrame()).hasChanged()) {
             saveMenuItemActionPerformed(null);
         }
 
         if (((FileFrame)desktopPane.getSelectedFrame()).getPreviouslySaved()) {
-            // Prepare console redirector so ErrorReporter output won't NPE
             ((FileFrame)desktopPane.getSelectedFrame()).selectConsole();
             ((FileFrame)desktopPane.getSelectedFrame()).clearConsole();
             output.setDelegate(delegateConsole);
@@ -735,8 +758,11 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_compileToLLVMMenuItemActionPerformed
 
+    /**
+     * Handles building the runtime (runtime.c -> runtime.ll / runtime.obj) by
+     * invoking the PowerShell helper script.
+     */
     private void buildRuntimeMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buildRuntimeMenuItemActionPerformed
-        // Run in background thread
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -788,11 +814,9 @@ public class Main extends javax.swing.JFrame {
                 return;
             }
 
-            // Use absolute ll path and prepare output exe name next to the .ll (use absolute path to avoid relative cwd issues)
             final String llAbsolute = new java.io.File(llfile).getAbsolutePath();
             String exeName = new java.io.File(llAbsolute.replaceAll("\\.ll$", "") + ".exe").getAbsolutePath();
-            // Prefer script relative to current working directory (runtime/...),
-            // but fall back to the original path if running from a different CWD.
+            
             java.io.File scriptFile = new java.io.File("runtime/compile_program_native.ps1");
             if (!scriptFile.exists()) {
                 scriptFile = new java.io.File("ide-triangle-v1.1.src/runtime/compile_program_native.ps1");
@@ -804,10 +828,17 @@ public class Main extends javax.swing.JFrame {
                 return;
             }
 
-            // Run script in background
             new Thread(new Runnable() { public void run() {
                 try {
-                    ProcessBuilder pb = new ProcessBuilder("powershell", "-ExecutionPolicy", "Bypass", "-File", script, "-ProgramLl", llAbsolute, "-OutExe", exeName);
+                    
+                    List<String> cmd = new ArrayList<String>();
+                    cmd.add("powershell"); cmd.add("-ExecutionPolicy"); cmd.add("Bypass");
+                    cmd.add("-File"); cmd.add(script);
+                    cmd.add("-ProgramLl"); cmd.add(llAbsolute);
+                    cmd.add("-OutExe"); cmd.add(exeName);
+                    // If optimize checkbox exists & selected, pass -Optimize to the script
+                    if (optimizeMenuItem != null && optimizeMenuItem.isSelected()) cmd.add("-Optimize");
+                    ProcessBuilder pb = new ProcessBuilder(cmd);
                     pb.directory(new java.io.File("."));
                     final Process p = pb.start();
                     java.io.BufferedReader out = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
@@ -825,10 +856,8 @@ public class Main extends javax.swing.JFrame {
                     final int exitCode = rc;
                     javax.swing.SwingUtilities.invokeLater(new Runnable(){ public void run(){
                         if (exitCode == 0) {
-                            // Store absolute path to the generated exe so Run Native uses the exact file
                             lastNativeExe = exeName;
                             try {
-                                // Show a small dialog with a clickable link to the generated EXE
                                 final String exeUri = new java.io.File(exeName).toURI().toString();
                                 final JEditorPane editor = new JEditorPane("text/html", "<html>Native executable generated:<br/><a href=\"" + exeUri + "\">" + exeName + "</a></html>");
                                 editor.setEditable(false);
@@ -848,11 +877,11 @@ public class Main extends javax.swing.JFrame {
                                 sp.setPreferredSize(new java.awt.Dimension(700,120));
                                 JOptionPane.showMessageDialog(null, sp, "Native executable generated", JOptionPane.PLAIN_MESSAGE);
                             } catch (Exception _e) {
-                                // Fallback to plain dialog
                                 JOptionPane.showMessageDialog(null, "Native executable generated: " + exeName);
                             }
                             runNativeMenuItem.setEnabled(true);
-                            // Also write the absolute path to the IDE Console for clarity
+                            // also enable the option to run the native exe in an external shell
+                            runNativeShellMenuItem.setEnabled(true);
                             try {
                                 ((FileFrame)desktopPane.getSelectedFrame()).writeToConsole("Native executable: " + exeName + "\n");
                             } catch (Exception _e) { /* best-effort */ }
@@ -876,14 +905,12 @@ public class Main extends javax.swing.JFrame {
             ((FileFrame)desktopPane.getSelectedFrame()).selectConsole();
             ((FileFrame)desktopPane.getSelectedFrame()).clearConsole();
         } catch (Exception e) { }
-        // Prefer the last generated native exe (absolute path) when available.
-        String source = desktopPane.getSelectedFrame().getTitle();
+    String source = desktopPane.getSelectedFrame().getTitle();
         java.io.File fexe = null;
         if (lastNativeExe != null) {
             fexe = new java.io.File(lastNativeExe);
             if (!fexe.exists()) fexe = null;
         }
-        // Fallback: try exe next to the source, then the runtime folder (old behavior)
         if (fexe == null) {
             String exe = source.replaceAll("\\.tri$", ".exe");
             fexe = new java.io.File(exe);
@@ -920,7 +947,6 @@ public class Main extends javax.swing.JFrame {
      */
     private void runNativeShellMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runNativeShellMenuItemActionPerformed
         try {
-            // Prefer the last generated native exe absolute path
             java.io.File exeFile = null;
             if (lastNativeExe != null) {
                 exeFile = new java.io.File(lastNativeExe);
@@ -937,8 +963,6 @@ public class Main extends javax.swing.JFrame {
                 return;
             }
 
-            // Build a command that opens a new PowerShell window and runs the exe, leaving it open (-NoExit)
-            // Use cmd /c start to ensure a new console window is created on Windows
             String exePath = exeFile.getAbsolutePath();
             ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "start", "powershell", "-NoExit", "-Command", "& '" + exePath + "'");
             pb.directory(exeFile.getParentFile());
@@ -1134,6 +1158,30 @@ public class Main extends javax.swing.JFrame {
             buttonCompile.setEnabled(true);
         }
     };
+
+    /** Handler for the Optimize IR checkbox menu item */
+    private void optimizeMenuItemActionPerformed(java.awt.event.ActionEvent evt) {
+        optimizeEnabled = (optimizeMenuItem != null) && optimizeMenuItem.isSelected();
+        try { ((FileFrame)desktopPane.getSelectedFrame()).writeToConsole("Optimize IR: " + optimizeEnabled + "\n"); } catch (Exception e) { }
+    }
+
+    /** Check if 'opt' is available on PATH by invoking it with --version. */
+    private boolean isOptAvailable() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("opt", "--version");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+            // read a line or two; presence of output indicates opt exists
+            String line = br.readLine();
+            p.destroy();
+            return (line != null && !line.isEmpty());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc=" GUI Variables ">
@@ -1151,6 +1199,7 @@ public class Main extends javax.swing.JFrame {
     javax.swing.JMenuItem compileToLLVMMenuItem;
     javax.swing.JMenuItem buildRuntimeMenuItem;
     javax.swing.JMenuItem compileToNativeMenuItem;
+    javax.swing.JCheckBoxMenuItem optimizeMenuItem;
     javax.swing.JMenuItem runNativeMenuItem;
     javax.swing.JMenuItem runNativeShellMenuItem;
     javax.swing.JMenuItem copyMenuItem;
@@ -1188,8 +1237,9 @@ public class Main extends javax.swing.JFrame {
     TreeVisitor treeVisitor = new TreeVisitor();                            // Draws the Abstract Syntax Trees
     TableVisitor tableVisitor = new TableVisitor();                         // Draws the Identifier Table
     File directory;                                                         // The current directory.
-    // Stores the last successfully generated native executable (absolute path).
     String lastNativeExe = null;
+    boolean optimizeEnabled = false;
+    
     // [ End of Non-GUI variables declaration ]
     // </editor-fold>    
     
@@ -1223,13 +1273,9 @@ public class Main extends javax.swing.JFrame {
             Transferable contents = clipboard.getContents(null);
             if (contents != null && contents.isDataFlavorSupported(DataFlavor.stringFlavor)) {
                 try {
-                    DataFlavor flavorSet[] = contents.getTransferDataFlavors();
-                    boolean canString = false;
-                    for (int i=0;i<flavorSet.length;i++)
-                        if (flavorSet[i] == DataFlavor.stringFlavor)
-                            canString = true;
-                    
-                    ret = (String)contents.getTransferData(DataFlavor.stringFlavor);
+                    try {
+                        ret = (String)contents.getTransferData(DataFlavor.stringFlavor);
+                    } catch (Exception ex) { /* fallback below */ }
                 } catch (Exception e) { }
             }
             return(ret);
